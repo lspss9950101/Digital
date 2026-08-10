@@ -59,6 +59,9 @@ public class DataPlotter implements Drawable {
     private static final int CENTER = SIZE / 2;
     private static final int SEP2 = 5;
     private static final int SEP = SEP2 * 2;
+    private static final int TRANSITION_WIDTH = 8;
+    private static final int LABEL_MARGIN = 2;
+    private static final String ELLIPSIS = "…";
 
     /**
      * Sets the column info used to format and interpret the plotted values.
@@ -298,7 +301,7 @@ public class DataPlotter implements Drawable {
                         boolean isNewRun = first || isHighZ != last[i].isHighZ || value != last[i].value;
 
                         if (!isHighZType) {
-                            int w = (int) Math.min(SIZE, 2 * size / 3.0);
+                            int w = (int) Math.min(TRANSITION_WIDTH, size);
                             boolean transition = !first && value != last[i].value && !isHighZ && !last[i].isHighZ;
 
                             int lx1 = x1;
@@ -354,7 +357,16 @@ public class DataPlotter implements Drawable {
     }
 
     private void drawBoxLabel(Graphic g, ValueTable.ColumnInfo info, long value, int xStart, int xEnd, int y) {
-        final String text = info.getFormat().formatToView(new de.neemann.digital.core.Value(value, info.getBits()));
+        String text = info.getFormat().formatToView(new de.neemann.digital.core.Value(value, info.getBits()));
+
+        int charWidth = Style.SHAPE_PIN.getFontSize() / 2;
+        int maxChars = (xEnd - xStart - 2 * LABEL_MARGIN) / charWidth;
+        if (text.length() > maxChars) {
+            if (maxChars <= 0)
+                return;
+            text = maxChars == 1 ? ELLIPSIS : text.substring(0, maxChars - 1) + ELLIPSIS;
+        }
+
         g.drawText(new Vector((xStart + xEnd) / 2, y + CENTER), text, Orientation.CENTERCENTER, Style.SHAPE_PIN);
     }
 
