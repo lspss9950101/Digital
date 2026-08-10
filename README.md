@@ -2,6 +2,11 @@
 
 # Digital #
 
+> **This is a modified fork** of [hneemann/Digital](https://github.com/hneemann/Digital), maintained for the
+> NTUEE-SCLD course starting August 2026. See [`distribution/ReleaseNotes.txt`](distribution/ReleaseNotes.txt) and
+> the [commit history](https://github.com/lspss9950101/Digital/commits/master) for what has changed. Licensed under
+> the GPLv3, same as the original project.
+
 Digital is an easy-to-use digital logic designer and circuit simulator designed for educational purposes.
 
 ![screnshot](distribution/screenshot.png)
