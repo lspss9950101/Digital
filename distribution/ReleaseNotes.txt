@@ -1,5 +1,14 @@
 Release Notes
 
+NTUEE-SCLD-v0.1, released on 11. August 2026
+- Waveform viewer: multi-bit signals now render as boxed values (GTKWave-style)
+  instead of a proportional height-map, with a right-click menu to choose the
+  display format per signal (hex, decimal, signed decimal, binary, octal,
+  sign-magnitude, ASCII).
+- Waveform viewer: labels are truncated when a box is too narrow to show the
+  full value, and the transition mark between values is a fixed, sharp size
+  regardless of zoom.
+
 HEAD, planned as v0.32
 - Fixed some bugs in the creation of circuits.
 - Fixed an Intel Hex import error that occurred when
