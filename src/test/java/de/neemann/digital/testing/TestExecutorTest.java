@@ -6,6 +6,7 @@
 package de.neemann.digital.testing;
 
 import de.neemann.digital.core.Model;
+import de.neemann.digital.data.ValueTable;
 import de.neemann.digital.draw.elements.Circuit;
 import de.neemann.digital.integration.ToBreakRunner;
 import junit.framework.TestCase;
@@ -48,6 +49,27 @@ public class TestExecutorTest extends TestCase {
         new TestExecutor(tcd, m).executeTo(256 * 256 * 2 - 1);
         assertEquals(255, m.getOutput("S").getValue());
         assertEquals(0, m.getOutput("O").getValue());
+    }
+
+    /**
+     * createColumnInfo() must report the real declared bit width (8 for S, an 8-bit output),
+     * not a width guessed from the values seen so far. Row 0 alone already has S==0, which a
+     * value-based guess (as previously used as a fallback in the waveform viewer) would
+     * misinterpret as a single-bit signal.
+     */
+    public void testColumnInfoUsesDeclaredBitWidthNotObservedValue() throws Exception {
+        TestExecutor executor = new TestExecutor(tcd, m);
+        executor.executeTo(0);
+        assertEquals(0, m.getOutput("S").getValue());
+
+        List<String> names = executor.getNames();
+        ValueTable.ColumnInfo[] info = executor.createColumnInfo();
+
+        assertEquals(8, info[names.indexOf("A")].getBits());
+        assertEquals(8, info[names.indexOf("B")].getBits());
+        assertEquals(1, info[names.indexOf("C")].getBits());
+        assertEquals(8, info[names.indexOf("S")].getBits());
+        assertEquals(1, info[names.indexOf("O")].getBits());
     }
 
 }

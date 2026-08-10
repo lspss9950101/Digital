@@ -9,6 +9,7 @@ import de.neemann.digital.core.*;
 import de.neemann.digital.core.element.Keys;
 import de.neemann.digital.core.wiring.Clock;
 import de.neemann.digital.data.Value;
+import de.neemann.digital.data.ValueTable;
 import de.neemann.digital.draw.elements.Circuit;
 import de.neemann.digital.draw.elements.PinException;
 import de.neemann.digital.draw.library.ElementLibrary;
@@ -346,6 +347,28 @@ public class TestExecutor {
      */
     public ArrayList<String> getNames() {
         return names;
+    }
+
+    /**
+     * Creates the column info (real bit width and a default format) for every column of
+     * this test, derived from the actual input/output signals. Used e.g. to render the
+     * test results correctly in the waveform viewer, instead of guessing the bit width
+     * from the observed values.
+     *
+     * @return the column info, one entry per column in {@link #getNames()}
+     */
+    public ValueTable.ColumnInfo[] createColumnInfo() {
+        ValueTable.ColumnInfo[] info = new ValueTable.ColumnInfo[names.size()];
+        for (TestSignal s : inputs)
+            if (s.getValue() != null)
+                info[s.getIndex()] = new ValueTable.ColumnInfo(IntFormat.DEFAULT_FORMATTER, s.getValue().getBits());
+        for (TestSignal s : outputs)
+            if (s.getValue() != null)
+                info[s.getIndex()] = new ValueTable.ColumnInfo(IntFormat.DEFAULT_FORMATTER, s.getValue().getBits());
+        for (int i = 0; i < info.length; i++)
+            if (info[i] == null)
+                info[i] = new ValueTable.ColumnInfo(IntFormat.HEX_FORMATTER, 1);
+        return info;
     }
 
     /**

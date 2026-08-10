@@ -215,7 +215,14 @@ public class GraphDialog extends JDialog implements Observer {
         setLocationRelativeTo(owner);
     }
 
-    GraphDialog setColumnInfo(ValueTable.ColumnInfo[] columnInfo) {
+    /**
+     * Sets the column info used to format and interpret the plotted values, and to
+     * distinguish single-bit from multi-bit signals in the graph.
+     *
+     * @param columnInfo the column info
+     * @return this for chained calls
+     */
+    public GraphDialog setColumnInfo(ValueTable.ColumnInfo[] columnInfo) {
         this.columnInfo = columnInfo;
         graphComponent.setColumnInfo(columnInfo);
         return this;

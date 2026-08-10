@@ -93,9 +93,12 @@ public class ValueTableDialog extends JDialog {
             public void actionPerformed(ActionEvent actionEvent) {
                 int tab = tp.getSelectedIndex();
                 if (tab < 0) tab = 0;
-                new GraphDialog(ValueTableDialog.this, Lang.get("win_testdata_N", tp.getTitleAt(tab)), resultTableData.get(tab).valueTable)
-                        .disableTable()
-                        .setVisible(true);
+                ValueTableHolder vth = resultTableData.get(tab);
+                GraphDialog gd = new GraphDialog(ValueTableDialog.this, Lang.get("win_testdata_N", tp.getTitleAt(tab)), vth.valueTable)
+                        .disableTable();
+                if (vth.columnInfo != null)
+                    gd.setColumnInfo(vth.columnInfo);
+                gd.setVisible(true);
             }
         }.setToolTip(Lang.get("menu_showDataAsGraph_tt"));
         view.add(asGraph.createJMenuItem());
@@ -125,9 +128,9 @@ public class ValueTableDialog extends JDialog {
         for (Circuit.TestCase ts : tsl) {
             ErrorDetector errorDetector = new ErrorDetector();
             try {
-                TestResult testResult = new TestExecutor(ts, circuit, library)
-                        .addObserver(errorDetector)
-                        .execute();
+                TestExecutor testExecutor = new TestExecutor(ts, circuit, library)
+                        .addObserver(errorDetector);
+                TestResult testResult = testExecutor.execute();
 
                 String tabName;
                 Icon tabIcon;
@@ -142,7 +145,7 @@ public class ValueTableDialog extends JDialog {
                 if (testResult.toManyResults())
                     tabName += " " + Lang.get("msg_test_missingLines");
 
-                ValueTableHolder vth = new ValueTableHolder(testResult.getValueTable(), ts.getTestCaseDescription());
+                ValueTableHolder vth = new ValueTableHolder(testResult.getValueTable(), ts.getTestCaseDescription(), testExecutor.createColumnInfo());
                 tp.addTab(tabName, tabIcon, new JScrollPane(createTable(vth)));
                 if (testResult.toManyResults())
                     tp.setToolTipTextAt(i, new LineBreaker().toHTML().breakLines(Lang.get("msg_test_missingLines_tt")));
@@ -252,15 +255,18 @@ public class ValueTableDialog extends JDialog {
     private static final class ValueTableHolder {
         private final ValueTable valueTable;
         private final TestCaseDescription testCaseDescription;
+        private final ValueTable.ColumnInfo[] columnInfo;
 
         private ValueTableHolder(ValueTable valueTable) {
             this.valueTable = valueTable;
             testCaseDescription = null;
+            columnInfo = null;
         }
 
-        private ValueTableHolder(ValueTable valueTable, TestCaseDescription testCaseDescription) {
+        private ValueTableHolder(ValueTable valueTable, TestCaseDescription testCaseDescription, ValueTable.ColumnInfo[] columnInfo) {
             this.valueTable = valueTable;
             this.testCaseDescription = testCaseDescription;
+            this.columnInfo = columnInfo;
         }
     }
 }
