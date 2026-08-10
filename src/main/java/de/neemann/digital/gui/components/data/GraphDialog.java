@@ -217,6 +217,7 @@ public class GraphDialog extends JDialog implements Observer {
 
     GraphDialog setColumnInfo(ValueTable.ColumnInfo[] columnInfo) {
         this.columnInfo = columnInfo;
+        graphComponent.setColumnInfo(columnInfo);
         return this;
     }
 

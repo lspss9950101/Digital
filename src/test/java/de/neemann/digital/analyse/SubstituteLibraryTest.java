@@ -63,7 +63,8 @@ public class SubstituteLibraryTest extends TestCase {
         check(IntFormat.decSigned, doImplicitTypeCasts(IntFormat.class, 2));
         check(IntFormat.def, doImplicitTypeCasts(IntFormat.class, -2));
         check(IntFormat.floating, doImplicitTypeCasts(IntFormat.class, 9));
-        check(IntFormat.def, doImplicitTypeCasts(IntFormat.class, 10));
+        check(IntFormat.signMag, doImplicitTypeCasts(IntFormat.class, 10));
+        check(IntFormat.def, doImplicitTypeCasts(IntFormat.class, 11));
         check(Orientation.RIGHTBOTTOM, doImplicitTypeCasts(Orientation.class, 2));
         check(Application.Type.GHDL, doImplicitTypeCasts(Application.Type.class, 1));
         check(LeftRightFormat.right, doImplicitTypeCasts(LeftRightFormat.class, 1));

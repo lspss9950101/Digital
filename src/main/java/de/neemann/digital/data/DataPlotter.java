@@ -7,6 +7,7 @@ package de.neemann.digital.data;
 
 import de.neemann.digital.core.IntFormat;
 import de.neemann.digital.core.SyncAccess;
+import de.neemann.digital.core.ValueFormatter;
 import de.neemann.digital.draw.graphics.Graphic;
 import de.neemann.digital.draw.graphics.Orientation;
 import de.neemann.digital.draw.graphics.Style;
@@ -33,6 +34,7 @@ public class DataPlotter implements Drawable {
     private JScrollBar horizontalScrollBar;
     private int autoScaleOffset;
     private JScrollBar verticalScrollBar;
+    private ValueTable.ColumnInfo[] columnInfo;
 
     /**
      * Creates a new instance
@@ -57,6 +59,86 @@ public class DataPlotter implements Drawable {
     private static final int CENTER = SIZE / 2;
     private static final int SEP2 = 5;
     private static final int SEP = SEP2 * 2;
+
+    /**
+     * Sets the column info used to format and interpret the plotted values.
+     * Entries which are missing (array too short, or a null entry) are filled in with a
+     * default derived from the observed data.
+     *
+     * @param columnInfo the column info, maybe null
+     */
+    public void setColumnInfo(ValueTable.ColumnInfo[] columnInfo) {
+        this.columnInfo = columnInfo;
+    }
+
+    private void ensureColumnInfo(ValueTable data) {
+        final int columns = data.getColumns();
+        if (columnInfo == null || columnInfo.length != columns) {
+            ValueTable.ColumnInfo[] newInfo = new ValueTable.ColumnInfo[columns];
+            for (int i = 0; i < columns; i++) {
+                if (columnInfo != null && i < columnInfo.length && columnInfo[i] != null)
+                    newInfo[i] = columnInfo[i];
+                else
+                    newInfo[i] = createDefaultColumnInfo(data, i);
+            }
+            columnInfo = newInfo;
+        } else {
+            for (int i = 0; i < columns; i++)
+                if (columnInfo[i] == null)
+                    columnInfo[i] = createDefaultColumnInfo(data, i);
+        }
+    }
+
+    private static ValueTable.ColumnInfo createDefaultColumnInfo(ValueTable data, int col) {
+        long max = data.getMax(col);
+        int bits = 64 - Long.numberOfLeadingZeros(Math.max(1, max));
+        return new ValueTable.ColumnInfo(IntFormat.HEX_FORMATTER, bits);
+    }
+
+    /**
+     * Returns the index of the signal drawn at the given y coordinate.
+     *
+     * @param y the y coordinate, in component coordinates
+     * @return the signal index, or -1 if there is no signal at that position
+     */
+    public int getSignalIndexAt(int y) {
+        int row = (y + yOffset - BORDER) / (SIZE + SEP);
+        if (row < 0 || row >= dataOriginal.getColumns())
+            return -1;
+        return row;
+    }
+
+    /**
+     * @param index the signal index
+     * @return true if the signal at the given index is a multi-bit (bus) signal
+     */
+    public boolean isMultiBit(int index) {
+        if (columnInfo == null || index < 0 || index >= columnInfo.length || columnInfo[index] == null)
+            return false;
+        return columnInfo[index].getBits() > 1;
+    }
+
+    /**
+     * @param index the signal index
+     * @return the display format currently used for the given signal, maybe null
+     */
+    public ValueFormatter getFormatOverride(int index) {
+        if (columnInfo == null || index < 0 || index >= columnInfo.length || columnInfo[index] == null)
+            return null;
+        return columnInfo[index].getFormat();
+    }
+
+    /**
+     * Overrides the display format used for the given signal.
+     *
+     * @param index  the signal index
+     * @param format the format to use
+     */
+    public void setFormatOverride(int index, ValueFormatter format) {
+        if (columnInfo == null || index < 0 || index >= columnInfo.length || columnInfo[index] == null)
+            return;
+        columnInfo[index] = columnInfo[index].withFormat(format);
+    }
 
     /**
      * Fits the data in the visible area
@@ -116,6 +198,8 @@ public class DataPlotter implements Drawable {
             }).data;
         }
 
+        ensureColumnInfo(data);
+
         final int availDataWidth = width - textWidth;
         final int preferredDataWidth = (int) (size * data.getRows());
 
@@ -158,6 +242,7 @@ public class DataPlotter implements Drawable {
         for (int i = 0; i < signals; i++) last[i] = new LastState();
 
         boolean first = true;
+        int lastVisibleX2 = -1;
         double pos = 0;
         for (TestRow s : data) {
             int x1 = (int) (pos + textWidth - xOffset);
@@ -184,48 +269,69 @@ public class DataPlotter implements Drawable {
                             style = Style.NORMAL;
                     }
 
-                    long width = data.getMax(i);
-                    if (width == 0) width = 1;
                     long value = s.getValue(i).getValue();
                     boolean isHighZ = s.getValue(i).isHighZ();
-                    int ry;
-                    long sWidth = (width >>> 32);
-                    if (sWidth == 0) {
-                        ry = (int) (SIZE - (SIZE * value) / width);
+                    boolean isHighZType = s.getValue(i).getType().equals(Value.Type.HIGHZ);
+
+                    if (columnInfo[i].getBits() <= 1) {
+                        long width = data.getMax(i);
+                        if (width == 0) width = 1;
+                        int ry;
+                        long sWidth = (width >>> 32);
+                        if (sWidth == 0) {
+                            ry = (int) (SIZE - (SIZE * value) / width);
+                        } else {
+                            ry = (int) (SIZE - (SIZE * (value >>> 32)) / sWidth);
+                        }
+
+                        if (!isHighZType)
+                            g.drawLine(new Vector(x1, y + ry), new Vector(x2, y + ry), style);
+
+                        if (!first && ry != last[i].y && !isHighZ && !last[i].isHighZ)
+                            g.drawLine(new Vector(x1, y + last[i].y), new Vector(x1, y + ry), style);
+
+                        if (!first && value != last[i].value && Math.abs(ry - last[i].y) < SEP2)
+                            g.drawLine(new Vector(x1, y + ry - SEP2), new Vector(x1, y + ry + SEP2), Style.NORMAL);
+
+                        last[i].y = ry;
                     } else {
-                        ry = (int) (SIZE - (SIZE * (value >>> 32)) / sWidth);
+                        boolean isNewRun = first || isHighZ != last[i].isHighZ || value != last[i].value;
+
+                        if (!isHighZType) {
+                            int w = (int) Math.min(SIZE, 2 * size / 3.0);
+                            boolean transition = !first && value != last[i].value && !isHighZ && !last[i].isHighZ;
+
+                            int lx1 = x1;
+                            if (transition) {
+                                g.drawLine(new Vector(x1, y), new Vector(x1 + w, y + SIZE), style);
+                                g.drawLine(new Vector(x1, y + SIZE), new Vector(x1 + w, y), style);
+                                lx1 = x1 + w;
+                            }
+
+                            if (isNewRun) {
+                                if (last[i].runOpen)
+                                    drawBoxLabel(g, columnInfo[i], last[i].value, last[i].runStartX, x1, y);
+                                last[i].runStartX = lx1;
+                                last[i].runOpen = true;
+                            }
+
+                            if (lx1 < x2) {
+                                g.drawLine(new Vector(lx1, y), new Vector(x2, y), style);
+                                g.drawLine(new Vector(lx1, y + SIZE), new Vector(x2, y + SIZE), style);
+                            }
+                        } else if (last[i].runOpen) {
+                            drawBoxLabel(g, columnInfo[i], last[i].value, last[i].runStartX, x1, y);
+                            last[i].runOpen = false;
+                        }
                     }
 
-                    if (value != last[i].value)
-                        last[i].hasChanged = true;
-
-                    if (width > 4 && last[i].textWidth == 0 && last[i].hasChanged) {
-                        final String text = IntFormat.toShortHex(value);
-                        last[i].textWidth = text.length() * SIZE / 2;
-                        if (ry > CENTER)
-                            g.drawText(new Vector(x1 + 1, y - SEP2 + 1), text, Orientation.LEFTTOP, Style.SHAPE_PIN);
-                        else
-                            g.drawText(new Vector(x1 + 1, y + SIZE + SEP2 - 1), text, Orientation.LEFTBOTTOM, Style.SHAPE_PIN);
-                        last[i].hasChanged = false;
-                    }
-
-                    if (!s.getValue(i).getType().equals(Value.Type.HIGHZ))
-                        g.drawLine(new Vector(x1, y + ry), new Vector(x2, y + ry), style);
-
-                    if (!first && ry != last[i].y && !isHighZ && !last[i].isHighZ)
-                        g.drawLine(new Vector(x1, y + last[i].y), new Vector(x1, y + ry), style);
-
-                    if (!first && value != last[i].value && Math.abs(ry - last[i].y) < SEP2)
-                        g.drawLine(new Vector(x1, y + ry - SEP2), new Vector(x1, y + ry + SEP2), Style.NORMAL);
-
-                    last[i].y = ry;
                     last[i].value = value;
                     last[i].isHighZ = isHighZ;
-                    last[i].decTextWidth(x2 - x1);
 
                     y += SIZE + SEP;
                 }
                 first = false;
+                lastVisibleX2 = x2;
             }
 
             if (width > 0 && x1 > width)
@@ -234,7 +340,22 @@ public class DataPlotter implements Drawable {
             pos += size;
 
         }
+
+        if (lastVisibleX2 >= 0) {
+            y = BORDER - yOffset;
+            for (int i = 0; i < signals; i++) {
+                if (columnInfo[i].getBits() > 1 && last[i].runOpen)
+                    drawBoxLabel(g, columnInfo[i], last[i].value, last[i].runStartX, lastVisibleX2, y);
+                y += SIZE + SEP;
+            }
+        }
+
         g.drawLine(new Vector(textWidth + dataAreaWidth, BORDER - SEP2 - yOffset), new Vector(textWidth + dataAreaWidth, (SIZE + SEP) * signals + BORDER - SEP2 - yOffset), Style.DASH);
+    }
+
+    private void drawBoxLabel(Graphic g, ValueTable.ColumnInfo info, long value, int xStart, int xEnd, int y) {
+        final String text = info.getFormat().formatToView(new de.neemann.digital.core.Value(value, info.getBits()));
+        g.drawText(new Vector((xStart + xEnd) / 2, y + CENTER), text, Orientation.CENTERCENTER, Style.SHAPE_PIN);
     }
 
     /**
@@ -334,15 +455,7 @@ public class DataPlotter implements Drawable {
         private long value;
         private boolean isHighZ;
         private int y;
-        private int textWidth;
-        private boolean hasChanged = true;
-
-        private void decTextWidth(int size) {
-            if (textWidth > 0) {
-                textWidth -= size;
-                if (textWidth < 0)
-                    textWidth = 0;
-            }
-        }
+        private int runStartX;
+        private boolean runOpen;
     }
 }

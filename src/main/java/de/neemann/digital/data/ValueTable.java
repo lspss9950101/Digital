@@ -328,6 +328,30 @@ public class ValueTable extends Observable implements Iterable<TestRow> {
             this.bits = bits;
         }
 
+        /**
+         * @return the number of bits of this column
+         */
+        public int getBits() {
+            return bits;
+        }
+
+        /**
+         * @return the formatter used for this column
+         */
+        public ValueFormatter getFormat() {
+            return format;
+        }
+
+        /**
+         * Creates a copy of this column info with a different formatter.
+         *
+         * @param newFormat the formatter to use
+         * @return the new column info
+         */
+        public ColumnInfo withFormat(ValueFormatter newFormat) {
+            return new ColumnInfo(newFormat, bits);
+        }
+
         private String format(Value value) {
             switch (value.getType()) {
                 case HIGHZ:
@@ -338,6 +362,25 @@ public class ValueTable extends Observable implements Iterable<TestRow> {
                     return "C";
                 default:
                     return format.formatToEdit(new de.neemann.digital.core.Value(value.getValue(), bits));
+            }
+        }
+
+        /**
+         * Formats the given value for read-only display, e.g. in the waveform viewer.
+         *
+         * @param value the value to format
+         * @return the formatted value as a string
+         */
+        public String formatToView(Value value) {
+            switch (value.getType()) {
+                case HIGHZ:
+                    return "Z";
+                case DONTCARE:
+                    return "X";
+                case CLOCK:
+                    return "C";
+                default:
+                    return format.formatToView(new de.neemann.digital.core.Value(value.getValue(), bits));
             }
         }
     }

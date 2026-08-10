@@ -5,10 +5,13 @@
  */
 package de.neemann.digital.gui.components.data;
 
+import de.neemann.digital.core.IntFormat;
 import de.neemann.digital.core.SyncAccess;
+import de.neemann.digital.core.ValueFormatter;
 import de.neemann.digital.data.DataPlotter;
 import de.neemann.digital.data.ValueTable;
 import de.neemann.digital.draw.graphics.GraphicSwing;
+import de.neemann.digital.lang.Lang;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,6 +25,10 @@ import java.awt.event.MouseEvent;
  * It shows the data in the given dataSet.
  */
 public class GraphComponent extends JComponent {
+    private static final IntFormat[] SELECTABLE_FORMATS = {
+            IntFormat.hex, IntFormat.dec, IntFormat.decSigned,
+            IntFormat.bin, IntFormat.oct, IntFormat.signMag, IntFormat.ascii};
+
     private final DataPlotter plotter;
 
     /**
@@ -66,6 +73,43 @@ public class GraphComponent extends JComponent {
                 plotter.setHeight(getHeight());
             }
         });
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                maybeShowFormatPopup(e);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                maybeShowFormatPopup(e);
+            }
+        });
+    }
+
+    private void maybeShowFormatPopup(MouseEvent e) {
+        if (!e.isPopupTrigger())
+            return;
+
+        final int index = plotter.getSignalIndexAt(e.getY());
+        if (index < 0 || !plotter.isMultiBit(index))
+            return;
+
+        ValueFormatter current = plotter.getFormatOverride(index);
+        JPopupMenu menu = new JPopupMenu();
+        ButtonGroup group = new ButtonGroup();
+        for (IntFormat fmt : SELECTABLE_FORMATS) {
+            ValueFormatter formatter = fmt.createFormatter(null);
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(Lang.get("key_intFormat_" + fmt.name()));
+            item.setSelected(formatter == current);
+            item.addActionListener(a -> {
+                plotter.setFormatOverride(index, formatter);
+                repaint();
+            });
+            group.add(item);
+            menu.add(item);
+        }
+        menu.show(this, e.getX(), e.getY());
     }
 
     @Override
@@ -108,6 +152,16 @@ public class GraphComponent extends JComponent {
      */
     DataPlotter getPlotter() {
         return plotter;
+    }
+
+    /**
+     * Sets the column info used to format and interpret the plotted values.
+     *
+     * @param columnInfo the column info
+     */
+    void setColumnInfo(ValueTable.ColumnInfo[] columnInfo) {
+        plotter.setColumnInfo(columnInfo);
+        repaint();
     }
 
     /**

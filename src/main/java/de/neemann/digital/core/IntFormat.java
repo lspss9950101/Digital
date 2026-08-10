@@ -51,7 +51,11 @@ public enum IntFormat {
     /**
      * floating point
      */
-    floating(new ValueFormatterFloat());
+    floating(new ValueFormatterFloat()),
+    /**
+     * sign magnitude
+     */
+    signMag(new ValueFormatterSignMagnitude());
 
     /**
      * The default formatter
@@ -387,6 +391,53 @@ public enum IntFormat {
         @Override
         public long dragValue(long initial, int bits, double inc) {
             return dragValueSigned(initial, bits, inc, signed);
+        }
+    }
+
+    /**
+     * The sign-magnitude value formatter.
+     * Unlike {@link ValueFormatterDecimal} with {@code signed==true}, which interprets the raw
+     * bits as two's complement, this interprets the MSB as a plain sign bit and the remaining
+     * bits as an unsigned magnitude. There is no unambiguous, generic way to parse a
+     * sign-magnitude decimal string back to its raw bits (unlike two's complement, which
+     * {@link Bits#decode(String)} understands natively), so this format is read-only for
+     * display purposes: {@link #formatToEdit(Value)} falls back to the hex representation,
+     * same as e.g. {@link ValueFormatterFloat} does for non-finite values.
+     */
+    private static final class ValueFormatterSignMagnitude implements ValueFormatter {
+
+        @Override
+        public String formatToView(Value inValue) {
+            if (inValue.isHighZ())
+                return inValue.toString();
+
+            final int bits = inValue.getBits();
+            final long signBit = Bits.signedFlagMask(bits);
+            final long v = inValue.getValue();
+            final long magnitude = v & (signBit - 1);
+            return ((v & signBit) != 0 ? "-" : "") + magnitude;
+        }
+
+        @Override
+        public String formatToEdit(Value inValue) {
+            if (inValue.isHighZ())
+                return "Z";
+            return HEX_FORMATTER.formatToEdit(inValue);
+        }
+
+        @Override
+        public int strLen(int bits) {
+            return decStrLen(bits - 1) + 1;
+        }
+
+        @Override
+        public boolean isSuitedForAddresses() {
+            return true;
+        }
+
+        @Override
+        public long dragValue(long initial, int bits, double inc) {
+            return dragValueSigned(initial, bits, inc, true);
         }
     }
 
