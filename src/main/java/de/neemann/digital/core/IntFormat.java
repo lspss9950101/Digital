@@ -66,6 +66,14 @@ public enum IntFormat {
      */
     public static final ValueFormatter HEX_FORMATTER = ValueFormatterHex.INSTANCE;
 
+    /**
+     * The formats offered to the user in format-selection menus (waveform viewer, test
+     * result table). Excludes formats that need extra attributes (fixed point) or are only
+     * ever picked automatically (def, floating).
+     */
+    public static final IntFormat[] SELECTABLE_FORMATS =
+            {hex, dec, decSigned, bin, oct, signMag, ascii};
+
     private final Factory factory;
     private final boolean dependsOnAttributes;
 

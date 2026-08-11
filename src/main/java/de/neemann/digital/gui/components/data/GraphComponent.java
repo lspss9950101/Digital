@@ -25,10 +25,6 @@ import java.awt.event.MouseEvent;
  * It shows the data in the given dataSet.
  */
 public class GraphComponent extends JComponent {
-    private static final IntFormat[] SELECTABLE_FORMATS = {
-            IntFormat.hex, IntFormat.dec, IntFormat.decSigned,
-            IntFormat.bin, IntFormat.oct, IntFormat.signMag, IntFormat.ascii};
-
     private final DataPlotter plotter;
 
     /**
@@ -98,7 +94,7 @@ public class GraphComponent extends JComponent {
         ValueFormatter current = plotter.getFormatOverride(index);
         JPopupMenu menu = new JPopupMenu();
         ButtonGroup group = new ButtonGroup();
-        for (IntFormat fmt : SELECTABLE_FORMATS) {
+        for (IntFormat fmt : IntFormat.SELECTABLE_FORMATS) {
             ValueFormatter formatter = fmt.createFormatter(null);
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(Lang.get("key_intFormat_" + fmt.name()));
             item.setSelected(formatter == current);

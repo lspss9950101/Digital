@@ -65,6 +65,22 @@ public class ValueTableTest extends TestCase {
         assertEquals(3, t.getMax(2));
     }
 
+    /**
+     * A raw {@link Value#toString()} omits the "0x" prefix for hex digits that contain a
+     * letter (e.g. "1A3" instead of "0x1A3", see {@link IntFormat#toShortHex}), which makes
+     * a column of hex values look inconsistent: some rows prefixed, some not. Multi-bit
+     * columns rendered through {@link ValueTable.ColumnInfo} (as used by the graph and test
+     * result table) must not have this inconsistency: the default format is upgraded to the
+     * always-prefixed {@link IntFormat#HEX_FORMATTER} for any column wider than 3 bits.
+     */
+    public void testColumnInfoHexPrefixIsAlwaysShown() {
+        assertEquals("1A3", new Value(0x1A3).toString());
+
+        ValueTable.ColumnInfo info = new ValueTable.ColumnInfo(IntFormat.DEFAULT_FORMATTER, 12);
+        assertEquals("0x113", info.formatToView(new Value(0x113)));
+        assertEquals("0x1A3", info.formatToView(new Value(0x1A3)));
+    }
+
     public void testOmit() {
         ValueTable t = new ValueTable("A");
         t.add(new TestRow(new Value(1)));

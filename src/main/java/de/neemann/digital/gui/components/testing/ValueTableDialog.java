@@ -6,6 +6,8 @@
 package de.neemann.digital.gui.components.testing;
 
 import de.neemann.digital.core.ErrorDetector;
+import de.neemann.digital.core.IntFormat;
+import de.neemann.digital.core.ValueFormatter;
 import de.neemann.digital.data.Value;
 import de.neemann.digital.data.ValueTable;
 import de.neemann.digital.data.ValueTableModel;
@@ -80,10 +82,11 @@ public class ValueTableDialog extends JDialog {
             public void actionPerformed(ActionEvent e) {
                 int tab = tp.getSelectedIndex();
                 if (tab < 0) tab = 0;
+                ValueTableHolder vth = resultTableData.get(tab);
                 JFileChooser fileChooser = new MyFileChooser();
                 fileChooser.setFileFilter(new FileNameExtensionFilter("Comma Separated Values", "csv"));
                 new SaveAsHelper(ValueTableDialog.this, fileChooser, "csv")
-                        .checkOverwrite(resultTableData.get(tab).valueTable::saveCSV);
+                        .checkOverwrite(file -> vth.valueTable.saveCSV(file, vth.columnInfo));
             }
         }.setToolTip(Lang.get("menu_saveData_tt")).createJMenuItem());
 
@@ -172,8 +175,21 @@ public class ValueTableDialog extends JDialog {
      * @return this for chained calls
      */
     public ValueTableDialog addValueTable(String name, ValueTable valueTable) {
-        tp.addTab(name, new JScrollPane(createTable(new ValueTableHolder(valueTable))));
-        resultTableData.add(new ValueTableHolder(valueTable));
+        return addValueTable(name, valueTable, null);
+    }
+
+    /**
+     * Add a table to this dialog
+     *
+     * @param name       the name of the tab
+     * @param valueTable the values
+     * @param columnInfo information of how to format the values, maybe null
+     * @return this for chained calls
+     */
+    public ValueTableDialog addValueTable(String name, ValueTable valueTable, ValueTable.ColumnInfo[] columnInfo) {
+        ValueTableHolder vth = new ValueTableHolder(valueTable, null, columnInfo);
+        tp.addTab(name, new JScrollPane(createTable(vth)));
+        resultTableData.add(vth);
 
         pack();
         setLocationRelativeTo(owner);
@@ -183,7 +199,7 @@ public class ValueTableDialog extends JDialog {
     private JTable createTable(ValueTableHolder valueTableHolder) {
         ValueTableModel vtm = new ValueTableModel(valueTableHolder.valueTable);
         JTable table = new JTable(vtm);
-        table.setDefaultRenderer(Value.class, new ValueRenderer());
+        table.setDefaultRenderer(Value.class, new ValueRenderer(valueTableHolder.columnInfo));
         table.setDefaultRenderer(Integer.class, new NumberRenderer());
         table.addMouseListener(new MouseAdapter() {
             @Override
@@ -199,9 +215,57 @@ public class ValueTableDialog extends JDialog {
                 }
             }
         });
+        if (valueTableHolder.columnInfo != null) {
+            table.getTableHeader().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    maybeShowFormatPopup(e, table, valueTableHolder.columnInfo);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    maybeShowFormatPopup(e, table, valueTableHolder.columnInfo);
+                }
+            });
+        }
         final Font font = table.getFont();
         table.setRowHeight(font.getSize() * 6 / 5);
         return table;
+    }
+
+    /**
+     * Shows a per-column number-format picker, triggered by right-clicking a column header.
+     *
+     * @param e          the mouse event that may be a popup trigger
+     * @param table      the table whose header was clicked
+     * @param columnInfo the column info to update, indexed like {@link ValueTable}'s columns
+     */
+    private void maybeShowFormatPopup(MouseEvent e, JTable table, ValueTable.ColumnInfo[] columnInfo) {
+        if (!e.isPopupTrigger())
+            return;
+
+        int viewCol = table.columnAtPoint(e.getPoint());
+        if (viewCol < 0)
+            return;
+        int col = table.convertColumnIndexToModel(viewCol) - 1;
+        if (col < 0 || col >= columnInfo.length)
+            return;
+
+        ValueFormatter current = columnInfo[col].getFormat();
+        JPopupMenu menu = new JPopupMenu();
+        ButtonGroup group = new ButtonGroup();
+        for (IntFormat fmt : IntFormat.SELECTABLE_FORMATS) {
+            ValueFormatter formatter = fmt.createFormatter(null);
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(Lang.get("key_intFormat_" + fmt.name()));
+            item.setSelected(formatter == current);
+            item.addActionListener(a -> {
+                columnInfo[col] = columnInfo[col].withFormat(formatter);
+                table.repaint();
+            });
+            group.add(item);
+            menu.add(item);
+        }
+        menu.show(table.getTableHeader(), e.getX(), e.getY());
     }
 
     /**
@@ -214,14 +278,23 @@ public class ValueTableDialog extends JDialog {
         return this;
     }
 
-    private static class ValueRenderer extends DefaultTableCellRenderer {
+    private static final class ValueRenderer extends DefaultTableCellRenderer {
+        private final ValueTable.ColumnInfo[] columnInfo;
+
+        private ValueRenderer(ValueTable.ColumnInfo[] columnInfo) {
+            this.columnInfo = columnInfo;
+        }
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             JLabel comp = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
             Value v = (Value) value;
             if (v != null) {
-                comp.setText(v.toString());
+                int col = table.convertColumnIndexToModel(column) - 1;
+                if (columnInfo != null && col >= 0 && col < columnInfo.length)
+                    comp.setText(columnInfo[col].formatToView(v));
+                else
+                    comp.setText(v.toString());
                 comp.setHorizontalAlignment(JLabel.CENTER);
 
                 switch (((Value) value).getState()) {
@@ -256,12 +329,6 @@ public class ValueTableDialog extends JDialog {
         private final ValueTable valueTable;
         private final TestCaseDescription testCaseDescription;
         private final ValueTable.ColumnInfo[] columnInfo;
-
-        private ValueTableHolder(ValueTable valueTable) {
-            this.valueTable = valueTable;
-            testCaseDescription = null;
-            columnInfo = null;
-        }
 
         private ValueTableHolder(ValueTable valueTable, TestCaseDescription testCaseDescription, ValueTable.ColumnInfo[] columnInfo) {
             this.valueTable = valueTable;

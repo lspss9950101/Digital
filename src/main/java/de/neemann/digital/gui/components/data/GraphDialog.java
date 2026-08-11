@@ -160,7 +160,7 @@ public class GraphDialog extends JDialog implements Observer {
             @Override
             public void actionPerformed(ActionEvent e) {
                 new ValueTableDialog(GraphDialog.this, title) // ToDo pass modelSync to ValueTableDialog
-                        .addValueTable(Lang.get("win_data"), logData)
+                        .addValueTable(Lang.get("win_data"), logData, columnInfo)
                         .disableGraph()
                         .setVisible(true);
             }
